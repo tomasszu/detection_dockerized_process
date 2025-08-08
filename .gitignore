@@ -1,0 +1,6 @@
+*.pt
+__pycache__/
+count_env/
+videos/*.avi
+videos/*.mp4
+
