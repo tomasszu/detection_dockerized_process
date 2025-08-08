@@ -14,13 +14,17 @@ def parse_args():
     parser.add_argument('--detection_model_path', type=str, default='yolov8x.pt', choices=['yolov8x.pt', 'yolov8l.pt', 'yolov5su.pt'] , help='Path to the YOLO model file.')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'], help='Device to run the model on (e.g., "cuda" or "cpu").')
 
-    parser.add_argument('--play_mode', type=int, default=100, help='Delay between frames in milliseconds. Set to 0 for manual frame stepping (Pressing Enter for new frame).')
+    parser.add_argument('--play_mode', type=int, default=200, help='Delay between frames in milliseconds. Set to 0 for manual frame stepping (Pressing Enter for new frame).')
 
-
+    # Args concerning the establishment of crop zones for video 1 and video 2
+    parser.add_argument('--crop_zone_rows_vid1', type=int, default=7, help='Number of rows in the crop zone grid for the first video.')
+    parser.add_argument('--crop_zone_cols_vid1', type=int, default=6, help='Number of columns in the crop zone grid for the first video.')
+    parser.add_argument('--crop_zone_area_bottom_left_vid1', type=tuple, default=(0, 1000), help='Bottom-left corner of the crop zone area as a tuple (x, y) for the first video.')
+    parser.add_argument('--crop_zone_area_top_right_vid1', type=tuple, default=(1750, 320), help='Top-right corner of the crop zone area as a tuple (x, y) for the first video.')
 
     return parser.parse_args()
 
-def run_demo(video_path1, roi_path1, detection_model, device, play_mode):
+def run_demo(video_path1, roi_path1, detection_model, device, crop_zone_rows_1, crop_zone_cols_1, crop_zone_area_bottom_left_1, crop_zone_area_top_right_1, play_mode):
     """ Run the vehicle re-identification demo with two videos. 
     Args:
         video_path1 (str): Path to the first video file.
@@ -53,7 +57,7 @@ def run_demo(video_path1, roi_path1, detection_model, device, play_mode):
     
     # Initialize the visualizers for both videos
     # The visualizers will annotate the frames with the detections and matched IDs
-    visualizer = Visualizer(detector.class_names)
+    visualizer = Visualizer(detector.class_names, rows=crop_zone_rows_1, cols=crop_zone_cols_1, area_bottom_left= crop_zone_area_bottom_left_1, area_top_right=crop_zone_area_top_right_1)
 
     while True:
         ret1, frame = detector.read_frame()
@@ -70,11 +74,6 @@ def run_demo(video_path1, roi_path1, detection_model, device, play_mode):
         send_detections(frame, detections)
 
         send_detections.clear()
-
-
-        #crops = cropper.crop(frame1, detections1)
-
-
         
         vis_frame = visualizer.annotate(frame, detections)
 
@@ -92,4 +91,4 @@ if __name__ == "__main__":
     #run_demo("video1.avi", "video2.avi")
     args = parse_args()
 
-    run_demo(video_path1=args.video_path1, roi_path1=args.roi_path1, detection_model=args.detection_model_path, device=args.device, play_mode=args.play_mode)
+    run_demo(video_path1=args.video_path1, roi_path1=args.roi_path1, detection_model=args.detection_model_path, device=args.device, crop_zone_rows_1 = args.crop_zone_rows_vid1, crop_zone_cols_1 = args.crop_zone_cols_vid1, crop_zone_area_bottom_left_1 = args.crop_zone_area_bottom_left_vid1, crop_zone_area_top_right_1 = args.crop_zone_area_top_right_vid1, play_mode=args.play_mode)
