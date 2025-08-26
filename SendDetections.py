@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 import time
 
 class SendDetections:
-    def __init__(self, class_ids_of_interest, mqtt_broker="localhost", mqtt_port=1884, mqtt_topic="tomass/detections"):
+    def __init__(self, class_ids_of_interest, mqtt_broker="localhost", mqtt_port=1884, mqtt_topic="tomass/detections_camera_1"):
         self.class_ids = class_ids_of_interest
         self.mqtt_broker = mqtt_broker
         self.mqtt_port = mqtt_port
@@ -66,6 +66,10 @@ class SendDetections:
 
                 crop = frame[y1:y2, x1:x2]
 
+                # Uncomment for debugging
+                # cv2.imshow("Cropped", crop)
+                # cv2.waitKey(0)  # Wait until a key is pressed
+
                 if crop.size == 0:
                     continue  # skip empty crop
 
@@ -76,7 +80,7 @@ class SendDetections:
                 self.data.append({
                     'track_id': int(track_id),
                     'bbox': (x_min, y_min, x_max, y_max),
-                    'encoded_crop': encoded_crop  # base64-encoded JPEG
+                    'image': encoded_crop  # base64-encoded JPEG
                 })
 
         self.send_over_mqtt()
@@ -94,7 +98,7 @@ class SendDetections:
             payload = {
                 "track_id": entry["track_id"],
                 "bbox": entry["bbox"],
-                "encoded_crop": entry["encoded_crop"]
+                "image": entry["image"]
             }
             result = self.client.publish(self.mqtt_topic, json.dumps(payload))
             if result[0] != 0:

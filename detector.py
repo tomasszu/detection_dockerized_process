@@ -140,8 +140,6 @@ class VehicleDetector:
             # Assign each tracked box to the detection with the highest IoU
             best_matches = iou_matrix.argmax(axis=0)  # shape: (num_tracked,)
 
-            print(best_matches)
-
             # Now for each tracked detection, attach the original box
             # The Original boxes are the ones from the detections before tracking
             # They allow us to get a more accurate representation of the original detection
