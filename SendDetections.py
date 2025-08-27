@@ -4,6 +4,7 @@ import base64
 import json
 import paho.mqtt.client as mqtt
 import time
+import uuid
 
 class SendDetections:
     def __init__(self, class_ids_of_interest, mqtt_broker="localhost", mqtt_port=1884, mqtt_topic="tomass/detections_camera_1"):
@@ -15,7 +16,9 @@ class SendDetections:
         self.data = []
 
         # Setup MQTT client
-        self.client = mqtt.Client(client_id="sender1")
+        client_id = f"detection_sender-{uuid.uuid4()}"
+        self.client = mqtt.Client(client_id=client_id)
+        
         self.client.on_connect = self.on_connect
         self.client.on_publish = self.on_publish
 
