@@ -9,7 +9,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--video_path1', type=str, default='videos/vdo4.avi', help='Path to the first video file. (Re-Identification FROM)')
+    parser.add_argument('--video_source', type=str, default='videos/vdo4.avi', help='Path to the first video file. (Re-Identification FROM)')
     parser.add_argument('--roi_path1', type=str, default="videos/vdo4_roi.png", help='Path to the ROI image for the first video. If not provided, it will try to auto-detect in the same folder based on the video name.')
     parser.add_argument('--detection_model_path', type=str, default='yolov8x.pt', choices=['yolov8x.pt', 'yolov8l.pt', 'yolov5su.pt'] , help='Path to the YOLO model file.')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'], help='Device to run the model on (e.g., "cuda" or "cpu").')
@@ -24,7 +24,7 @@ def parse_args():
 
     return parser.parse_args()
 
-def run_demo(video_path1, roi_path1, detection_model, device, crop_zone_rows_1, crop_zone_cols_1, crop_zone_area_bottom_left_1, crop_zone_area_top_right_1, play_mode):
+def run_demo(video_source, roi_path1, detection_model, device, crop_zone_rows_1, crop_zone_cols_1, crop_zone_area_bottom_left_1, crop_zone_area_top_right_1, play_mode):
     """ Run the vehicle re-identification demo with two videos. 
     Args:
         video_path1 (str): Path to the first video file.
@@ -49,10 +49,10 @@ def run_demo(video_path1, roi_path1, detection_model, device, crop_zone_rows_1, 
     print("Starting vehicle detection demo...")
 
     # Initialize the vehicle detectors for both videos
-    detector = VehicleDetector(video_path=video_path1, roi_path=roi_path1, model_path=detection_model, device=device)
+    detector = VehicleDetector(video_source=video_source, roi_path=roi_path1, model_path=detection_model, device=device)
 
-    # Initialize sending class once
-    send_detections = SendDetections(detector.class_ids)
+    # # Initialize sending class once
+    # send_detections = SendDetections(detector.class_ids)
 
     
     # Initialize the visualizers for both videos
@@ -71,9 +71,9 @@ def run_demo(video_path1, roi_path1, detection_model, device, crop_zone_rows_1, 
 
 
         
-        send_detections(frame, detections)
+        # send_detections(frame, detections)
 
-        send_detections.clear()
+        # send_detections.clear()
         
         vis_frame = visualizer.annotate(frame, detections)
 
@@ -91,4 +91,4 @@ if __name__ == "__main__":
     #run_demo("video1.avi", "video2.avi")
     args = parse_args()
 
-    run_demo(video_path1=args.video_path1, roi_path1=args.roi_path1, detection_model=args.detection_model_path, device=args.device, crop_zone_rows_1 = args.crop_zone_rows_vid1, crop_zone_cols_1 = args.crop_zone_cols_vid1, crop_zone_area_bottom_left_1 = args.crop_zone_area_bottom_left_vid1, crop_zone_area_top_right_1 = args.crop_zone_area_top_right_vid1, play_mode=args.play_mode)
+    run_demo(video_source=args.video_source, roi_path1=args.roi_path1, detection_model=args.detection_model_path, device=args.device, crop_zone_rows_1 = args.crop_zone_rows_vid1, crop_zone_cols_1 = args.crop_zone_cols_vid1, crop_zone_area_bottom_left_1 = args.crop_zone_area_bottom_left_vid1, crop_zone_area_top_right_1 = args.crop_zone_area_top_right_vid1, play_mode=args.play_mode)

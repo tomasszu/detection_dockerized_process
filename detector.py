@@ -8,6 +8,8 @@ This is useful for visualization and further processing."""
 import supervision as sv
 from ultralytics import YOLO
 
+from ffmpegvideocapture import FFmpegVideoCapture
+
 import cv2
 import numpy as np
 from supervision.detection.utils import box_iou_batch
@@ -37,8 +39,19 @@ class VehicleDetector:
         get_current_frame_index():
             Returns the current frame index of the video capture.
     """
-    def __init__(self, model_path, device, video_path: str, class_ids=None, roi_path=None, start_offset_frames: int = 0):
-        self.cap = cv2.VideoCapture(video_path)
+    def __init__(self, model_path, device, video_source: str, class_ids=None, roi_path=None, start_offset_frames: int = 0):
+        
+        # video_source can be a local path or rtsp/http url
+
+        # check if the first 4 symbols are rtsp
+        if video_source.lower().startswith(("rtsp", "http")):
+            print(f"Using RTSP/HTTP stream from: {video_source}")
+            self.cap = FFmpegVideoCapture(video_source)
+        else:
+            print(f"Using local video file from: {video_source}")
+            self.cap = cv2.VideoCapture(video_source)       
+        
+        
         self.model = YOLO(model_path).to(device)
         self.tracker = sv.ByteTrack()
         self.device = device
@@ -47,9 +60,7 @@ class VehicleDetector:
         self.class_names = self.model.model.names
         self.conf_threshold = 0.6
 
-        self.roi_mask = self._load_roi(roi_path, video_path)
-
-
+        self.roi_mask = self._load_roi(roi_path, video_source)
         self.delay_frames = start_offset_frames
         self.frozen_frame = None
         self.current_frame_index = 0

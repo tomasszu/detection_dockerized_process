@@ -10,11 +10,13 @@ import signal
 
 keep_running = True
 
+### TEST CODE ON JETSON WITH VIDEO FILES
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_source', type=str, default='videos/vdo4.avi', help='Path to the first video file. (Re-Identification FROM)')
     # parser.add_argument('--roi_path1', type=str, default="videos/vdo4_roi.png", help='Path to the ROI image for the first video. If not provided, it will try to auto-detect in the same folder based on the video name.')
-    parser.add_argument('--roi_path1', type=str, help='Path to the ROI image for the first video. If not provided, it will try to auto-detect in the same folder based on the video name.')
+    parser.add_argument('--roi_path', type=str, help='Path to the ROI image for the first video. If not provided, it will try to auto-detect in the same folder based on the video name.')
     parser.add_argument('--detection_model_path', type=str, default='yolov8x.pt', choices=['yolov8x.pt', 'yolov8l.pt', 'yolov5su.pt'] , help='Path to the YOLO model file.')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'], help='Device to run the model on (e.g., "cuda" or "cpu").')
 
@@ -36,7 +38,7 @@ def run_demo(args):
     global keep_running
 
     # Initialize the vehicle detectors for both videos
-    detector = VehicleDetector(video_source=args.video_source, roi_path=args.roi_path1, model_path=args.detection_model_path, device=args.device)
+    detector = VehicleDetector(video_source=args.video_source, roi_path=args.roi_path, model_path=args.detection_model_path, device=args.device)
 
     # Initialize sending class once
     send_detections = SendDetections(detector.class_ids, mqtt_topic=args.mqtt_topic)

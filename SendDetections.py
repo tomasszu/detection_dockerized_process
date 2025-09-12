@@ -106,8 +106,10 @@ class SendDetections:
             result = self.client.publish(self.mqtt_topic, json.dumps(payload))
             if result[0] != 0:
                 print(f"[MQTT] Failed to send message for track_id {entry['track_id']}")
+            else:
+                print(f"[MQTT] Sent message for track_id {entry['track_id']}")
 
-        time.sleep(0.25)  # Let messages flush
+        #time.sleep(0.25)  # Let messages flush
     
     def preview_crops(self, wait_ms=0):
         """
