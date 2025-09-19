@@ -5,6 +5,8 @@ from SendDetections import SendDetections
 
 import cv2
 
+
+
 import argparse
 
 def parse_args():
@@ -14,7 +16,7 @@ def parse_args():
     parser.add_argument('--detection_model_path', type=str, default='yolov8x.pt', choices=['yolov8x.pt', 'yolov8l.pt', 'yolov5su.pt'] , help='Path to the YOLO model file.')
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'], help='Device to run the model on (e.g., "cuda" or "cpu").')
 
-    parser.add_argument('--play_mode', type=int, default=200, help='Delay between frames in milliseconds. Set to 0 for manual frame stepping (Pressing Enter for new frame).')
+    parser.add_argument('--play_mode', type=int, default=25, help='Delay between frames in milliseconds. Set to 0 for manual frame stepping (Pressing Enter for new frame).')
 
     # Args concerning the establishment of crop zones for video 1 and video 2
     parser.add_argument('--crop_zone_rows_vid1', type=int, default=7, help='Number of rows in the crop zone grid for the first video.')
@@ -59,6 +61,10 @@ def run_demo(video_source, roi_path1, detection_model, device, crop_zone_rows_1,
     # The visualizers will annotate the frames with the detections and matched IDs
     visualizer = Visualizer(detector.class_names, rows=crop_zone_rows_1, cols=crop_zone_cols_1, area_bottom_left= crop_zone_area_bottom_left_1, area_top_right=crop_zone_area_top_right_1)
 
+    #Provision recording of the output video
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(f'{video_source}output.avi', fourcc, 20.0, (1280, 720))
+
     while True:
         ret1, frame = detector.read_frame()
 
@@ -83,9 +89,11 @@ def run_demo(video_source, roi_path1, detection_model, device, crop_zone_rows_1,
         cv2.imshow("Vehicle Re-ID Demo", frame)
         if cv2.waitKey(play_mode) & 0xFF == ord('q'):
             break
+        out.write(frame)
 
     detector.release()
     cv2.destroyAllWindows()
+    out.release()
 
 if __name__ == "__main__":
     #run_demo("video1.avi", "video2.avi")
