@@ -23,5 +23,8 @@ RUN pip install --no-cache-dir -r /app/requirements_Jetson.txt \
 WORKDIR /app
 COPY . /app
 
+# Šitā bij agrāk, bet ja grib padot argumentus, tad vajadzētu likt entrypoint CMD vietā
+#CMD ["python3", "main_jetson.py"]
 
-CMD ["python3", "main_jetson.py"]
+ENTRYPOINT ["python3", "main_jetson.py"]
+CMD []

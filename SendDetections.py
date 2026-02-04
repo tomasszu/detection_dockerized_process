@@ -41,7 +41,7 @@ class SendDetections:
             print(f"[MQTT] Connection failed with code {rc}")
 
     def on_publish(self, client, userdata, mid):
-        #print("[MQTT] Message published, mid =", mid)
+        print("[MQTT] Message published, mid =", mid)
         pass
 
     def __call__(self, frame: np.ndarray, detections):
