@@ -26,5 +26,4 @@ COPY . /app
 # Šitā bij agrāk, bet ja grib padot argumentus, tad vajadzētu likt entrypoint CMD vietā
 #CMD ["python3", "main_jetson.py"]
 
-ENTRYPOINT ["python3", "main_jetson.py"]
-CMD []
+ENTRYPOINT ["python", "main_jetson.py"]
