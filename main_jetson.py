@@ -5,10 +5,20 @@ from SendDetections import SendDetections
 import argparse
 
 import time
-
+import logging
+import os
 import signal
+from metrics import FPSMonitor
+from queue import Queue
 
 keep_running = True
+
+fps_monitor = FPSMonitor(window_sec=5)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
 
 ### THIS CODE RUNS ON NETWORK CAMERA VIDEO STREAMS
 
@@ -28,40 +38,99 @@ def parse_args():
     return parser.parse_args()
 
 def stop(self, signum):
-        print(f"\n[INFO] Caught signal {signum}. Exiting gracefully...")
+        logging.info(f"\n[INFO] Caught signal {signum}. Exiting gracefully...")
         global keep_running
         keep_running = False  
 
 def run_demo(args):
-    print("Starting vehicle detection demo...")
+    logging.info("Starting vehicle detection demo...")
 
     global keep_running
 
     # Initialize the vehicle detectors for both videos
-    detector = VehicleDetector(video_source=args.video_source, roi_path=args.roi_path, model_path=args.detection_model_path, device=args.device)
+    detector = VehicleDetector(
+        video_source=args.video_source,
+        roi_path=args.roi_path,
+        model_path=args.detection_model_path,
+        device=args.device
+    )
 
     # Initialize sending class once
-    send_detections = SendDetections(detector.class_ids, mqtt_topic=args.mqtt_topic)
+    send_detections = SendDetections(
+        detector.class_ids,
+        mqtt_topic=args.mqtt_topic
+    )
+
+    # ---- MONITORING CONFIG ----
+    MAX_FAILURES = 20
+    FAILURE_WINDOW = 300  # seconds
+    HEARTBEAT_INTERVAL = 30  # seconds
+
+    failure_timestamps = []
+    last_heartbeat = time.time()
 
     while keep_running:
-        ret1, frame = detector.read_frame()
 
-        if not ret1:
-            print("End of video stream.")
-            break
+        ret, frame = detector.read_frame()
 
-        # Process the frames from both videos
+        # ==========================
+        # STREAM FAILURE HANDLING
+        # ==========================
+        if not ret:
+            logging.warning("Frame read failed.")
+
+            now = time.time()
+            failure_timestamps.append(now)
+
+            # Keep only recent failures
+            failure_timestamps = [
+                t for t in failure_timestamps
+                if now - t < FAILURE_WINDOW
+            ]
+
+            logging.warning(
+                f"Failures in last {FAILURE_WINDOW}s: {len(failure_timestamps)}"
+            )
+
+            if len(failure_timestamps) > MAX_FAILURES:
+                logging.critical("Too many failures. Triggering nuclear exit.")
+                os.kill(os.getpid(), signal.SIGTERM)
+
+            continue
+        
+        # FPS Monitoring
+        recv_time = time.time()
+        fps_monitor.frame_received()
+
+
+        # ==========================
+        # NORMAL PROCESSING
+        # ==========================
+        # With FPS monitoring before and after
+
         detections, frame = detector.process_frame(frame)
 
+        fps_monitor.frame_processed(recv_time)
 
-        
         send_detections(frame, detections)
-
         send_detections.clear()
 
-        # # Add a small pause (e.g. 33ms = ~30 FPS)
-        # time.sleep(args.play_mode/1000)
+        # ==========================
+        # HEARTBEAT LOGGING
+        # ==========================
+        stats = fps_monitor.get_stats()
 
+        if time.time() - last_heartbeat > HEARTBEAT_INTERVAL:
+            logging.info("Heartbeat: detection loop alive.")
+            last_heartbeat = time.time()
+
+            logging.info(
+                f"[FPS] recv_fps={stats['recv_fps']} | "
+                f"proc_fps={stats['proc_fps']} | "
+                f"latency={stats['avg_latency_ms']} ms"
+            )
+
+    logging.info("Shutting down detector.")
     detector.release()
 
 if __name__ == "__main__":

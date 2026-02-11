@@ -11,13 +11,14 @@ RUN apt-get update && apt-get install -y \
     ffmpeg libsm6 libxext6 libxrender-dev \
     libgl1-mesa-glx python3-pip \
     git wget unzip \
-    python3-opencv \
     && apt-get clean
 
 # Upgrade pip and install Python packages
 COPY requirements_Jetson.txt /app/
 RUN pip install --no-cache-dir -r /app/requirements_Jetson.txt \
     --index-url https://pypi.org/simple
+
+
 
 # Set working directory
 WORKDIR /app
@@ -26,4 +27,4 @@ COPY . /app
 # Šitā bij agrāk, bet ja grib padot argumentus, tad vajadzētu likt entrypoint CMD vietā
 #CMD ["python3", "main_jetson.py"]
 
-ENTRYPOINT ["python", "main_jetson.py"]
+ENTRYPOINT ["python3", "main_jetson.py"]

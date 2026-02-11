@@ -5,6 +5,7 @@ import json
 import paho.mqtt.client as mqtt
 import time
 import uuid
+import logging
 
 class SendDetections:
     def __init__(self, class_ids_of_interest, mqtt_broker="localhost", mqtt_port=1884, mqtt_topic="tomass/detections_camera_1"):
@@ -35,13 +36,13 @@ class SendDetections:
 
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
-            print("[MQTT] Connected successfully")
+            logging.info("[MQTT] Connected successfully")
             self.connected = True
         else:
-            print(f"[MQTT] Connection failed with code {rc}")
+            logging.error(f"[MQTT] Connection failed with code {rc}")
 
     def on_publish(self, client, userdata, mid):
-        print("[MQTT] Message published, mid =", mid)
+        logging.info("[MQTT] Message published, mid = %s", mid)
         pass
 
     def __call__(self, frame: np.ndarray, detections):
@@ -106,9 +107,9 @@ class SendDetections:
             }
             result = self.client.publish(self.mqtt_topic, json.dumps(payload))
             if result[0] != 0:
-                print(f"[MQTT] Failed to send message for track_id {entry['track_id']}")
+                logging.critical(f"[MQTT] Failed to send message for track_id {entry['track_id']}")
             else:
-                print(f"[MQTT] Sent message for track_id {entry['track_id']}")
+                logging.info(f"[MQTT] Sent message for track_id {entry['track_id']}")
 
         #time.sleep(0.25)  # Let messages flush
     
@@ -126,7 +127,7 @@ class SendDetections:
             crop = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
             if crop is None:
-                print(f"[{i}] Failed to decode crop.")
+                logging.warning(f"[{i}] Failed to decode crop.")
                 continue
 
             track_id = entry['track_id']

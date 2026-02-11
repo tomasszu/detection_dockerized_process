@@ -12,6 +12,7 @@ from ffmpegvideocapture import FFmpegVideoCapture
 
 import cv2
 import numpy as np
+import logging
 from supervision.detection.utils import box_iou_batch
 
 class VehicleDetector:
@@ -45,10 +46,10 @@ class VehicleDetector:
 
         # check if the first 4 symbols are rtsp
         if video_source.lower().startswith(("rtsp", "http")):
-            print(f"Using RTSP/HTTP stream from: {video_source}")
-            self.cap = FFmpegVideoCapture(video_source)
+            logging.info(f"Using RTSP stream (ffmpeg): {video_source}")
+            self.cap = FFmpegVideoCapture(video_source, width=1280, height=960, timeout=5, fps=3)
         else:
-            print(f"Using local video file from: {video_source}")
+            logging.info(f"Using local video file from: {video_source}")
             self.cap = cv2.VideoCapture(video_source)       
         
         
@@ -75,7 +76,7 @@ class VehicleDetector:
         """
         # If explicitly given, try to load
         if roi_path and os.path.exists(roi_path):
-            print(f"Using provided ROI from: {roi_path}")
+            logging.info(f"Using provided ROI from: {roi_path}")
             return cv2.imread(roi_path, cv2.IMREAD_GRAYSCALE)
 
         # Otherwise try to derive from video path
@@ -91,11 +92,11 @@ class VehicleDetector:
                         auto_roi_path_d if os.path.exists(auto_roi_path_d) else None
 
         if auto_roi_path:
-            print(f"Using auto-detected ROI from: {auto_roi_path}")
+            logging.info(f"Using auto-detected ROI from: {auto_roi_path}")
             # Ensure the ROI is grayscale
             return cv2.imread(auto_roi_path, cv2.IMREAD_GRAYSCALE)
 
-        print(f" No auto found ROI with filename {auto_roi_path}. Using full frame.")
+        logging.warning(f" No auto found ROI with filename {auto_roi_path}. Using full frame.")
         return None
 
 
