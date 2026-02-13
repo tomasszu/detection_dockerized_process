@@ -27,6 +27,8 @@ class FFmpegVideoCapture:
         self.latest_frame = None
         self.frame_ready = threading.Event()
         self.last_successful_read = time.time()
+        
+        logging.info(f"Initializing FFmpeg capture: {width}x{height}, frame_size={self.frame_size} bytes")
         self._start_ffmpeg()
 
     def _consume_stderr(self):
@@ -47,10 +49,64 @@ class FFmpegVideoCapture:
             else:
                 time.sleep(0.1)
 
+    def _read_exact_bytes(self, n_bytes, timeout_seconds):
+        """Read exact number of bytes with timeout, or return None if failed."""
+        raw = b""
+        deadline = time.time() + timeout_seconds
+        
+        while len(raw) < n_bytes:
+            if self._stop_event.is_set():
+                return None
+            
+            if time.time() > deadline:
+                logging.error(f"Timeout reading bytes: got {len(raw)}/{n_bytes}")
+                return None
+            
+            if self.proc is None or self.proc.poll() is not None:
+                logging.error("FFmpeg process died during read")
+                return None
+            
+            remaining = n_bytes - len(raw)
+            chunk_size = min(65536, remaining)
+            
+            try:
+                chunk = self.proc.stdout.read(chunk_size)
+                if not chunk:
+                    logging.error(f"EOF: got {len(raw)}/{n_bytes} bytes")
+                    return None
+                raw += chunk
+            except Exception as e:
+                logging.error(f"Error reading bytes: {e}")
+                return None
+        
+        return raw
+
+    def _discard_bytes(self, n_bytes):
+        """Discard n bytes from the stream to resync."""
+        logging.warning(f"Discarding {n_bytes} bytes to resync stream...")
+        discarded = 0
+        while discarded < n_bytes and not self._stop_event.is_set():
+            chunk_size = min(65536, n_bytes - discarded)
+            try:
+                chunk = self.proc.stdout.read(chunk_size)
+                if not chunk:
+                    logging.error("EOF while discarding bytes")
+                    return False
+                discarded += len(chunk)
+            except Exception as e:
+                logging.error(f"Error discarding bytes: {e}")
+                return False
+        logging.info(f"Discarded {discarded} bytes successfully")
+        return True
+
     def _read_frames_continuously(self):
         """Continuously read frames in background, keeping only the latest."""
         consecutive_failures = 0
-        max_failures = 10
+        max_failures = 3  # Restart sooner on failures
+        frame_count = 0
+        
+        # Wait a bit for FFmpeg to start outputting
+        time.sleep(1)
         
         while not self._stop_event.is_set():
             if self.proc is None or self.proc.poll() is not None:
@@ -59,43 +115,61 @@ class FFmpegVideoCapture:
                 continue
                 
             try:
-                # Use a more robust read with smaller chunks
-                raw = b""
-                read_timeout = time.time() + self.timeout
+                # Read exact frame size with timeout
+                raw = self._read_exact_bytes(self.frame_size, self.timeout)
                 
-                while len(raw) < self.frame_size and time.time() < read_timeout:
-                    if self._stop_event.is_set():
-                        return
-                    
-                    chunk_size = min(65536, self.frame_size - len(raw))  # Read in 64KB chunks
-                    try:
-                        chunk = self.proc.stdout.read(chunk_size)
-                        if not chunk:
-                            logging.warning("FFmpeg stdout returned empty chunk (EOF or disconnected)")
-                            break
-                        raw += chunk
-                    except Exception as e:
-                        logging.error(f"Error reading chunk: {e}")
-                        break
-                
-                if len(raw) != self.frame_size:
+                if raw is None:
                     consecutive_failures += 1
-                    if len(raw) > 0:
-                        logging.warning(f"Incomplete frame: {len(raw)}/{self.frame_size} bytes (failure {consecutive_failures}/{max_failures})")
+                    logging.warning(f"Failed to read frame (failure {consecutive_failures}/{max_failures})")
                     
                     if consecutive_failures >= max_failures:
                         logging.error("Too many consecutive failures, restarting FFmpeg...")
                         self._restart_ffmpeg()
                         consecutive_failures = 0
+                        frame_count = 0
                     
-                    time.sleep(0.1)
+                    time.sleep(0.5)
                     continue
                 
-                # Successfully read a frame
+                if len(raw) != self.frame_size:
+                    # CRITICAL: We got partial data. This will corrupt alignment!
+                    # We MUST discard this data and skip to the next frame boundary
+                    logging.error(f"Got {len(raw)}/{self.frame_size} bytes - DISCARDING to prevent misalignment")
+                    
+                    # Discard the remainder to get back to frame boundary
+                    bytes_to_discard = self.frame_size - len(raw)
+                    if not self._discard_bytes(bytes_to_discard):
+                        logging.error("Failed to resync, restarting FFmpeg")
+                        self._restart_ffmpeg()
+                        consecutive_failures = 0
+                        frame_count = 0
+                    
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_failures:
+                        self._restart_ffmpeg()
+                        consecutive_failures = 0
+                        frame_count = 0
+                    
+                    continue
+                
+                # Successfully read a complete frame
                 consecutive_failures = 0
-                frame = np.frombuffer(raw, np.uint8).reshape(
-                    (self.height, self.width, self.channels)
-                )
+                frame_count += 1
+                
+                try:
+                    frame = np.frombuffer(raw, dtype=np.uint8).reshape(
+                        (self.height, self.width, self.channels)
+                    )
+                    
+                    # Diagnostic: check first few frames colors
+                    if frame_count <= 3:
+                        sample = frame[self.height//2:self.height//2+10, self.width//2:self.width//2+10, :]
+                        logging.info(f"Frame {frame_count} sample (BGR): B={sample[:,:,0].mean():.1f}, G={sample[:,:,1].mean():.1f}, R={sample[:,:,2].mean():.1f}")
+                    
+                except ValueError as e:
+                    logging.error(f"Error reshaping frame: {e}, bytes={len(raw)}, expected={self.frame_size}")
+                    consecutive_failures += 1
+                    continue
                 
                 # Store only the latest frame (discard old ones)
                 with self.lock:
@@ -105,7 +179,7 @@ class FFmpegVideoCapture:
                     
             except Exception as e:
                 consecutive_failures += 1
-                logging.error(f"Error in frame reading thread: {e}")
+                logging.error(f"Error in frame reading thread: {e}", exc_info=True)
                 time.sleep(0.1)
 
     def _start_ffmpeg(self):
@@ -120,20 +194,24 @@ class FFmpegVideoCapture:
                 except Exception:
                     pass
         
-        # Simplified, compatible command
+        # Build command - ensure correct pixel format and size
         cmd = [
             "ffmpeg",
             "-rtsp_transport", "tcp",
             "-i", self.rtsp_url,
             "-f", "rawvideo",
-            "-pix_fmt", "bgr24",
-            "-an",  # No audio
+            "-pix_fmt", "bgr24",  # OpenCV expects BGR
+            "-s", f"{self.width}x{self.height}",  # Force exact output size
         ]
         
+        # Add fps filter if specified
         if self.fps:
             cmd.extend(["-r", str(self.fps)])
         
-        cmd.append("-")
+        cmd.extend([
+            "-an",  # No audio
+            "-"
+        ])
         
         logging.info(f"FFmpeg command: {' '.join(cmd)}")
         
@@ -142,7 +220,7 @@ class FFmpegVideoCapture:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                bufsize=self.frame_size * 2  # Small buffer
+                bufsize=0  # Unbuffered - critical for alignment
             )
             self.latest_frame = None
             self.frame_ready.clear()
@@ -159,7 +237,7 @@ class FFmpegVideoCapture:
         
         # Wait for first successful frame with feedback
         logging.info("Waiting for first frame from FFmpeg...")
-        for i in range(20):  # Wait up to 10 seconds
+        for i in range(30):  # Wait up to 15 seconds
             if self.frame_ready.is_set():
                 logging.info("First frame received successfully!")
                 return
@@ -175,6 +253,8 @@ class FFmpegVideoCapture:
         with self.lock:
             old_proc = self.proc
             self.proc = None
+            self.frame_ready.clear()
+            self.latest_frame = None
             
         try:
             if old_proc:
@@ -213,8 +293,8 @@ class FFmpegVideoCapture:
         with self.lock:
             if self.latest_frame is None:
                 return False, None
-            # Return a copy of the latest frame
-            frame = self.latest_frame.copy()
+            # Return the latest frame
+            frame = self.latest_frame
         
         return True, frame
 

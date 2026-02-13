@@ -47,7 +47,7 @@ class VehicleDetector:
         # check if the first 4 symbols are rtsp
         if video_source.lower().startswith(("rtsp", "http")):
             logging.info(f"Using RTSP stream (ffmpeg): {video_source}")
-            self.cap = FFmpegVideoCapture(video_source, width=1280, height=960, timeout=5, fps=3)
+            self.cap = FFmpegVideoCapture(video_source, width=1280, height=960, timeout=5)
         else:
             logging.info(f"Using local video file from: {video_source}")
             self.cap = cv2.VideoCapture(video_source)       
