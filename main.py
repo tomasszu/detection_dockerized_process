@@ -19,8 +19,16 @@ def parse_args():
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda','cpu'], help='Device to run the model on (e.g., "cuda" or "cpu").')
 
     parser.add_argument('--play_mode', type=int, default=200, help='Delay between frames in milliseconds. Set to 0 for manual frame stepping (Pressing Enter for new frame).')
+    
     parser.add_argument('--mqtt_topic', type=str, default="tomass/detections_camera_1", help='mqtt topic to send the detections to.')
+    parser.add_argument('--cam_id', type=str, required=True, help='Unique camera identifier (must match feature extractor config)')
 
+    parser.add_argument('--mqtt_broker', type=str, default='reid-vehicle-detection')
+    parser.add_argument('--mqtt_port', type=int, default=8884)
+    parser.add_argument('--mqtt_certs_path', type=str, default='certs')
+    parser.add_argument('--cafile', type=str, default=None)
+    parser.add_argument('--certfile', type=str, default=None)
+    parser.add_argument('--keyfile', type=str, default=None)
 
 
     return parser.parse_args()
@@ -39,7 +47,17 @@ def run_demo(args):
     detector = VehicleDetector(video_source=args.video_source, roi_path=args.roi_path1, model_path=args.detection_model_path, device=args.device)
 
     # Initialize sending class once
-    send_detections = SendDetections(detector.class_ids, mqtt_topic=args.mqtt_topic)
+    send_detections = SendDetections(
+        detector.class_ids,
+        mqtt_broker=args.mqtt_broker,
+        mqtt_port=args.mqtt_port,
+        mqtt_topic=args.mqtt_topic,
+        mqtt_certs_path=args.mqtt_certs_path,
+        cafile=args.cafile,
+        certfile=args.certfile,
+        keyfile=args.keyfile,
+        cam_id=args.cam_id
+    )
 
     while keep_running:
         ret1, frame = detector.read_frame()

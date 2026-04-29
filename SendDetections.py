@@ -8,17 +8,39 @@ import uuid
 import logging
 
 class SendDetections:
-    def __init__(self, class_ids_of_interest, mqtt_broker="localhost", mqtt_port=1884, mqtt_topic="tomass/detections_camera_1"):
+    def __init__(
+        self,
+        class_ids_of_interest,
+        mqtt_broker="edgejet2.edi.lv",
+        mqtt_port=8884,
+        mqtt_topic="reid-vehicle-detection",
+        mqtt_certs_path="certs",
+        cafile=None,
+        certfile=None,
+        keyfile=None,
+        cam_id=None
+    ):
         self.class_ids = class_ids_of_interest
         self.mqtt_broker = mqtt_broker
         self.mqtt_port = mqtt_port
         self.mqtt_topic = mqtt_topic
         self.connected = False  # Flag to track connection status
         self.data = []
+        self.cam_id = cam_id
 
         # Setup MQTT client
         client_id = f"detection_sender-{uuid.uuid4()}"
         self.client = mqtt.Client(client_id=client_id)
+
+        if cafile and certfile and keyfile:
+            self.client.tls_set(
+                ca_certs=f"{mqtt_certs_path}/{cafile}",
+                certfile=f"{mqtt_certs_path}/{certfile}",
+                keyfile=f"{mqtt_certs_path}/{keyfile}"
+            )
+            self.client.tls_insecure_set(True)  # if self-signed
+        else:
+            logging.warning("[MQTT] TLS not fully configured, using insecure connection")
         
         self.client.on_connect = self.on_connect
         self.client.on_publish = self.on_publish
@@ -101,6 +123,7 @@ class SendDetections:
     def send_over_mqtt(self):
         for entry in self.data:
             payload = {
+                "cam_id": self.cam_id,
                 "track_id": entry["track_id"],
                 "bbox": entry["bbox"],
                 "image": entry["image"]
