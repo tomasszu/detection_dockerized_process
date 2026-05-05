@@ -41,12 +41,15 @@ def parse_args():
     parser.add_argument('--cafile', type=str, default=None)
     parser.add_argument('--certfile', type=str, default=None)
     parser.add_argument('--keyfile', type=str, default=None)
+    parser.add_argument('--force_width', type=int, default=None, help='Force width on the ffmpeg input e.g. 1280 for Network cameras or 2048 for Fish-eye.')
+    parser.add_argument('--force_height', type=int, default=None, help='Force height on the ffmpeg input e.g. 960.')
+
 
 
 
     return parser.parse_args()
 
-def stop(self, signum):
+def stop(signum, frame):
         logging.info(f"\n[INFO] Caught signal {signum}. Exiting gracefully...")
         global keep_running
         keep_running = False  
@@ -61,7 +64,9 @@ def run_demo(args):
         video_source=args.video_source,
         roi_path=args.roi_path,
         model_path=args.detection_model_path,
-        device=args.device
+        device=args.device,
+        force_width=args.force_width,
+        force_height=args.force_height
     )
 
     # Initialize sending class once

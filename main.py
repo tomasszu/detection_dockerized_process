@@ -23,12 +23,14 @@ def parse_args():
     parser.add_argument('--mqtt_topic', type=str, default="tomass/detections_camera_1", help='mqtt topic to send the detections to.')
     parser.add_argument('--cam_id', type=str, required=True, help='Unique camera identifier (must match feature extractor config)')
 
-    parser.add_argument('--mqtt_broker', type=str, default='reid-vehicle-detection')
+    parser.add_argument('--mqtt_broker', type=str, default='edgejet2vpn.edi.lv')
     parser.add_argument('--mqtt_port', type=int, default=8884)
     parser.add_argument('--mqtt_certs_path', type=str, default='certs')
     parser.add_argument('--cafile', type=str, default=None)
     parser.add_argument('--certfile', type=str, default=None)
     parser.add_argument('--keyfile', type=str, default=None)
+    parser.add_argument('--force_width', type=int, default=None, help='Force width on the ffmpeg input e.g. 1280 for Network cameras or 2048 for Fish-eye.')
+    parser.add_argument('--force_height', type=int, default=None, help='Force height on the ffmpeg input e.g. 960.')
 
 
     return parser.parse_args()
@@ -44,7 +46,7 @@ def run_demo(args):
     global keep_running
 
     # Initialize the vehicle detectors for both videos
-    detector = VehicleDetector(video_source=args.video_source, roi_path=args.roi_path1, model_path=args.detection_model_path, device=args.device)
+    detector = VehicleDetector(video_source=args.video_source, roi_path=args.roi_path1, model_path=args.detection_model_path, device=args.device, force_width=args.force_width, force_height=args.force_height)
 
     # Initialize sending class once
     send_detections = SendDetections(

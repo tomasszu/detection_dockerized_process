@@ -40,14 +40,37 @@ class VehicleDetector:
         get_current_frame_index():
             Returns the current frame index of the video capture.
     """
-    def __init__(self, model_path, device, video_source: str, class_ids=None, roi_path=None, start_offset_frames: int = 0):
-        
+    def __init__(
+        self,
+        video_source: str,
+        model_path,
+        device,
+        class_ids=None,
+        roi_path=None,
+        start_offset_frames: int = 0,
+        force_width=None,
+        force_height=None
+    ):        
         # video_source can be a local path or rtsp/http url
+
+        if force_width is not None and force_height is not None:
+            width=force_width
+            height=force_height
+            logging.info(f"Force resizing input to {force_width}x{force_height}")
+        elif force_width is not None or force_height is not None:
+            logging.warning("Both force_width and force_height must be set to apply resizing. Ignoring force resize.")
+            width = 1280
+            height = 960
+            logging.info(f"Using default input size {width}x{height}")
+        else:
+            width = 1280
+            height = 960
+            logging.info(f"Using default input size {width}x{height}")
 
         # check if the first 4 symbols are rtsp
         if video_source.lower().startswith(("rtsp", "http")):
             logging.info(f"Using RTSP stream (ffmpeg): {video_source}")
-            self.cap = FFmpegVideoCapture(video_source, width=1280, height=960, timeout=5)
+            self.cap = FFmpegVideoCapture(video_source, width=width, height=height, timeout=5)
         else:
             logging.info(f"Using local video file from: {video_source}")
             self.cap = cv2.VideoCapture(video_source)       
