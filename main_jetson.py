@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument('--keyfile', type=str, default=None)
     parser.add_argument('--force_width', type=int, default=None, help='Force width on the ffmpeg input e.g. 1280 for Network cameras or 2048 for Fish-eye.')
     parser.add_argument('--force_height', type=int, default=None, help='Force height on the ffmpeg input e.g. 960.')
-
+    parser.add_argument('--frame_correction_type', type=str, default=None, help='Type of pre-set frame correction to apply (e.g., "edgejetcam4.edi.lv").')
 
 
 
@@ -66,7 +66,8 @@ def run_demo(args):
         model_path=args.detection_model_path,
         device=args.device,
         force_width=args.force_width,
-        force_height=args.force_height
+        force_height=args.force_height,
+        frame_correction_type=args.frame_correction_type
     )
 
     # Initialize sending class once

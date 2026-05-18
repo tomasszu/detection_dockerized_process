@@ -49,7 +49,8 @@ class VehicleDetector:
         roi_path=None,
         start_offset_frames: int = 0,
         force_width=None,
-        force_height=None
+        force_height=None,
+        frame_correction_type=None
     ):        
         # video_source can be a local path or rtsp/http url
 
@@ -88,6 +89,10 @@ class VehicleDetector:
         self.delay_frames = start_offset_frames
         self.frozen_frame = None
         self.current_frame_index = 0
+
+        self.frame_correction_type = frame_correction_type
+        if self.frame_correction_type:
+            logging.info(f"Frame correction type set to: {self.frame_correction_type}")
 
     def _load_roi(self, roi_path, video_path):
         """Loads the ROI mask from the specified path or derives it from the video path.
@@ -135,6 +140,49 @@ class VehicleDetector:
         else:
             ret, frame = self.cap.read()
             return ret, frame
+        
+    def undistort_image_regular(self, image, K, D):
+        """
+        Undistorts an image using the camera intrinsics and distortion coefficients.
+        
+        Parameters:
+        - image: Input image to be undistorted.
+        - K: Camera intrinsics matrix.
+        - D: Distortion coefficients.
+        
+        Returns:
+        - undistorted_image: The undistorted image.
+        """
+        h, w = image.shape[:2]    
+
+        # Undistort using fisheye model
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(
+            K, D, np.eye(3), K, (w, h), cv2.CV_16SC2
+        )
+        
+        undistorted_image = cv2.remap(image, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+        return undistorted_image
+        
+    def undistort_fisheye(self, frame, type):
+
+        if type == "edgejetcam4.edi.lv":
+
+            img = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+            # fisheye intrinsics
+            fx = 1280.0
+            fy = 600.0
+            cx = 1280.0
+            cy = 700.0
+            K_fish = np.array([[fx, 0, cx],
+                            [0, fy, cy],
+                            [0, 0, 1]], dtype=np.float32)
+            D_fish = np.array([-0.05, 0.03, 0.01, -0.001], dtype=np.float64)  # example fisheye distortion coeffs
+
+            undistorted_image = self.undistort_image_regular(img, K_fish, D_fish)
+
+        return undistorted_image
 
     def process_frame(self, frame):
         """Processes a single frame to detect vehicles, applying the ROI mask if available.
@@ -146,6 +194,9 @@ class VehicleDetector:
         Raises:
             ValueError: If the frame is None or empty.
         """
+
+        if self.frame_correction_type:
+            frame = self.undistort_fisheye(frame, self.frame_correction_type)
 
         if self.roi_mask is not None:
             roi_frame = cv2.bitwise_and(frame, frame, mask=self.roi_mask)
